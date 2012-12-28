@@ -9,6 +9,16 @@
   
 */
 
+// Define debug state (1 for yes, 0 for no)
+#define DEBUG 0
+
+// Define available modes
+#define IDLE 1
+#define SHORT_BREAK 2
+#define LONG_BREAK 3
+#define POMODORO 4
+#define IN_PROCESS 5
+
 // Constants for input/output pins
 const int greenLed1 = 7;  // Green LEDs are for the pomodoro count
 const int greenLed2 = 8;
@@ -30,15 +40,16 @@ const int shortBreakTime = 5;
 const int longBreakTime = 15;
 
 // Fields to hold state
-int currentMode = 1;        // Values are 1 = IDLE, 2 = SHORT_BREAK, 3 = LONG_BREAK, 4 = POMODORO
-int currentPomodoroCount;
-long stateStartTime;        // In milliseconds
+int currentMode = IDLE;    // Values are IDLE, SHORT_BREAK, LONG_BREAK, POMODORO, IN_PROCESS
+int nextMode = POMODORO;   // Holds the next mode
+int currentPomodoroCount;  // Number of completed pomodoros
+long stateStartTime;       // In milliseconds
 int ledState = LOW;        // This will be used if a LED needs to blink
 long previousMillis = 0;   // Last time the LED was updated
 long blinkInterval = 1000; // In milliseconds
 
 void setup() {
-  //Serial.begin(9600);
+  if (DEBUG) Serial.begin(9600);
   
   // Set pins to the proper mode
   pinMode(greenLed1, OUTPUT);
@@ -69,11 +80,52 @@ void loop() {
 
 void checkButtons() {
   // See if any button are pressed, if they are, do something
-  if(digitalRead(button1) == HIGH) {
-    currentMode = 3;
-    stateStartTime = millis();
+  
+  if(digitalRead(button2) == HIGH) {
+    // debounce, ignore any button presses one second after a state change
+    if ((millis() - stateStartTime) < 1000) {
+      return;
+    }
+    // full reset
+    setCurrentMode(IDLE);
+    if (DEBUG) Serial.println("RESET!");
   }
   
+  if(digitalRead(button1) == HIGH) {
+    // debounce, ignore any button presses one second after a state change
+    if ((millis() - stateStartTime) < 1000) {
+      return;
+    }
+    
+    switch (currentMode) {
+      case IDLE:
+        // do nothing
+        setCurrentMode(POMODORO);
+        nextMode = SHORT_BREAK;
+        if (DEBUG) Serial.println("changing to pomodoro mode");
+        break;
+      case SHORT_BREAK:
+        setCurrentMode(IN_PROCESS);
+        nextMode = POMODORO;
+        Serial.println("changing to in process mode from short break");
+        break;
+      case LONG_BREAK:
+        resetPomodoroCount();
+        setCurrentMode(IDLE);
+        if (DEBUG) Serial.println("changing to idle mode from long break");
+        break;
+      case POMODORO:
+        setCurrentMode(IN_PROCESS);
+        nextMode = POMODORO;
+        if (DEBUG) Serial.println("changing to in process mode from pomodoro");
+        break;
+      case IN_PROCESS:
+        setCurrentMode(nextMode);
+        Serial.print("changing from in process to next mode: ");
+        Serial.println(nextMode);
+        break;
+    }
+  }
 }
 
 void incrementTime() {
@@ -82,32 +134,43 @@ void incrementTime() {
   
   // Increment the timer, see if the state needs to change
   switch (currentMode) {
-    case 1:
+    case IDLE:
       // Idle mode, do nothing
       break;
-    case 2:
+    case SHORT_BREAK:
       // short break code here
       // If break is over, change modes
-      if(currentMillis - stateStartTime > (shortBreakTime * 60 * 1000)){
-        currentMode = 1;
+      if(currentMillis - stateStartTime > convertMinuteToMillis(shortBreakTime)){
+        setCurrentMode(IN_PROCESS);
+        nextMode = POMODORO;
       }
       break;
-    case 3:
+    case LONG_BREAK:
       // long break code here
-      if(currentMillis - stateStartTime > (longBreakTime * 60 * 1000)){
-        currentMode = 1;
+      if(currentMillis - stateStartTime > convertMinuteToMillis(longBreakTime)){
+        setCurrentMode(IDLE);
+        nextMode = POMODORO;
+        resetPomodoroCount();
       }
       break;
-    case 4:
+    case POMODORO:
       // pomodoro code here
-      if(currentMillis - stateStartTime > (pomodoroTime * 60 * 1000)){
+      if(currentMillis - stateStartTime > convertMinuteToMillis(pomodoroTime)){
         currentPomodoroCount++;
-        currentMode = 1;
+        if (currentPomodoroCount == 4) {
+          setCurrentMode(IN_PROCESS);
+          nextMode = LONG_BREAK;
+        } else {
+          setCurrentMode(IN_PROCESS);
+          nextMode = SHORT_BREAK;
+        }
       }
       break;
+    case IN_PROCESS:
+      // do nothing
     default:
-      // same as IDLE, I think
-      currentMode = 1;
+      // do nothing
+      break;
   }
  
 }
@@ -119,7 +182,103 @@ void displayState() {
   int numLights;
   
   // We always light the proper number of pomodoro number lights
-  switch (currentPomodoroCount) {
+  lightGreenLeds(currentPomodoroCount);
+  
+  // Light up leds based on the current state
+  switch (currentMode) {
+    case IDLE:
+      // Idle mode, turn off the lights, this is going to need to be fixed
+      turnAllOff();
+      break;
+    case SHORT_BREAK:
+      // short break code here
+      // Figure out how many lights to light
+      digitalWrite(amberLed1, HIGH);
+      millisPassed = currentMillis - stateStartTime;
+      numLights = (shortBreakTime - convertMillisToMinute(millisPassed)) / (shortBreakTime / 5) + 1; // Adding one because of integer math, this is a hack
+      lightRedLeds(numLights);
+      break;
+    case LONG_BREAK:
+      // long break code here
+      // Figure out how many lights to light
+      digitalWrite(amberLed2, HIGH);
+      millisPassed = currentMillis - stateStartTime;
+      numLights = (longBreakTime - convertMillisToMinute(millisPassed)) / (longBreakTime / 5) + 1; // Adding one because of integer math, this is a hack
+      lightRedLeds(numLights);
+      break;
+    case POMODORO:
+      // pomodoro code here
+      millisPassed = currentMillis - stateStartTime;
+      numLights = (pomodoroTime - convertMillisToMinute(millisPassed)) / (pomodoroTime / 5) + 1; // Adding one because of integer math, this is a hack
+      lightRedLeds(numLights);
+      break;
+    case IN_PROCESS:
+      lightRedLeds(0);
+    default:
+      // Do nothing, for now
+      digitalWrite(amberLed1, LOW);
+      digitalWrite(amberLed2, LOW);
+  }
+  
+}
+
+// Light the number of red LEDs specified
+void lightRedLeds(int numLeds) {
+        switch (numLeds) {
+        case 1:
+          digitalWrite(redLed1, blinkLed());
+          digitalWrite(redLed2, LOW);
+          digitalWrite(redLed3, LOW);
+          digitalWrite(redLed4, LOW);
+          digitalWrite(redLed5, LOW);
+          break;
+        case 2:
+          digitalWrite(redLed1, HIGH);
+          digitalWrite(redLed2, blinkLed());
+          digitalWrite(redLed3, LOW);
+          digitalWrite(redLed4, LOW);
+          digitalWrite(redLed5, LOW);  
+          break;     
+        case 3:
+          digitalWrite(redLed1, HIGH);
+          digitalWrite(redLed2, HIGH);
+          digitalWrite(redLed3, blinkLed());
+          digitalWrite(redLed4, LOW);
+          digitalWrite(redLed5, LOW);
+          break;
+        case 4:
+          digitalWrite(redLed1, HIGH);
+          digitalWrite(redLed2, HIGH);
+          digitalWrite(redLed3, HIGH);
+          digitalWrite(redLed4, blinkLed());
+          digitalWrite(redLed5, LOW);
+          break;
+        case 5:
+          digitalWrite(redLed1, HIGH);
+          digitalWrite(redLed2, HIGH);
+          digitalWrite(redLed3, HIGH);
+          digitalWrite(redLed4, HIGH);
+          digitalWrite(redLed5, blinkLed());
+          break;
+        case 6:
+          // Same as 5, this is a hack
+          digitalWrite(redLed1, HIGH);
+          digitalWrite(redLed2, HIGH);
+          digitalWrite(redLed3, HIGH);
+          digitalWrite(redLed4, HIGH);
+          digitalWrite(redLed5, blinkLed());
+        default:
+          digitalWrite(redLed1, LOW);
+          digitalWrite(redLed2, LOW);
+          digitalWrite(redLed3, LOW);
+          digitalWrite(redLed4, LOW);
+          digitalWrite(redLed5, LOW);
+      }
+}
+
+// Light the number of green LEDs specified
+void lightGreenLeds(int numLeds) {
+    switch (numLeds) {
     case 1:
       digitalWrite(greenLed1, HIGH);
       digitalWrite(greenLed2, LOW);
@@ -150,121 +309,6 @@ void displayState() {
       digitalWrite(greenLed3, LOW);
       digitalWrite(greenLed4, LOW);
   }
-  
-  // Light up leds based on the current state, might need to blinky
-  switch (currentMode) {
-    case 1:
-      // Idle mode, do nothing
-      digitalWrite(amberLed1, LOW);
-      break;
-    case 2:
-      // short break code here
-      // Figure out how many lights to light
-      digitalWrite(amberLed1, HIGH);
-      millisPassed = currentMillis - stateStartTime;
-      numLights = (shortBreakTime - ((millisPassed / 1000) / 60)) / (longBreakTime / 5);
-      switch (numLights) {
-        case 1:
-          digitalWrite(redLed1, blinkLed());
-          digitalWrite(redLed2, LOW);
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-          break;
-        case 2:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, blinkLed());
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);  
-          break;     
-        case 3:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, blinkLed());
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-          break;
-        case 4:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, HIGH);
-          digitalWrite(redLed4, blinkLed());
-          digitalWrite(redLed5, LOW);
-          break;
-        case 5:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, HIGH);
-          digitalWrite(redLed4, HIGH);
-          digitalWrite(redLed5, blinkLed());
-          break;
-        default:
-          digitalWrite(redLed1, LOW);
-          digitalWrite(redLed2, LOW);
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-          digitalWrite(amberLed1, LOW);
-      }
-      break;
-    case 3:
-      // long break code here
-      // Figure out how many lights to light
-      digitalWrite(amberLed2, HIGH);
-      millisPassed = currentMillis - stateStartTime;
-      numLights = (longBreakTime - ((millisPassed / 1000) / 60)) / (longBreakTime / 5);
-      switch (numLights) {
-        case 1:
-          digitalWrite(redLed1, blinkLed());
-          digitalWrite(redLed2, LOW);
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-          break;
-        case 2:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, blinkLed());
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);  
-          break;     
-        case 3:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, blinkLed());
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-          break;
-        case 4:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, HIGH);
-          digitalWrite(redLed4, blinkLed());
-          digitalWrite(redLed5, LOW);
-          break;
-        case 5:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, HIGH);
-          digitalWrite(redLed4, HIGH);
-          digitalWrite(redLed5, blinkLed());
-          break;
-        default:
-          digitalWrite(redLed1, LOW);
-          digitalWrite(redLed2, LOW);
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-      }
-      break;
-    case 4:
-      // pomodoro code here
-    default:
-      // same as IDLE, I think
-      currentMode = 1;
-  }
-  
 }
  
 int blinkLed() {
@@ -311,6 +355,24 @@ void turnAllOff() {
  digitalWrite(redLed5, LOW);
  digitalWrite(amberLed1, LOW);
  digitalWrite(amberLed2, LOW);
+}
+
+long convertMinuteToMillis(int minutes) {
+  return minutes * 60000;
+}
+
+int convertMillisToMinute(long millis) {
+  return millis / 60000;
+}
+
+// This sets the current mode
+void setCurrentMode(int newMode) {
+  currentMode = newMode;
+  stateStartTime = millis();
+}
+
+void resetPomodoroCount() {
+  currentPomodoroCount = 0;
 }
 
 
