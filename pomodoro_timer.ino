@@ -9,7 +9,7 @@
   
 */
 
-// Define debug state (1 for yes, 0 for no)
+// Define debug state (1 for debug, 0 for not)
 #define DEBUG 0
 
 // Define available modes
@@ -107,7 +107,7 @@ void checkButtons() {
       case SHORT_BREAK:
         setCurrentMode(IN_PROCESS);
         nextMode = POMODORO;
-        Serial.println("changing to in process mode from short break");
+        if (DEBUG) Serial.println("changing to in process mode from short break");
         break;
       case LONG_BREAK:
         resetPomodoroCount();
@@ -121,8 +121,8 @@ void checkButtons() {
         break;
       case IN_PROCESS:
         setCurrentMode(nextMode);
-        Serial.print("changing from in process to next mode: ");
-        Serial.println(nextMode);
+        if (DEBUG) Serial.print("changing from in process to next mode: ");
+        if (DEBUG) Serial.println(nextMode);
         break;
     }
   }
@@ -179,7 +179,7 @@ void displayState() {
   
   unsigned long currentMillis = millis();
   unsigned long millisPassed;
-  int numLights;
+  float numLeds;
   
   // We always light the proper number of pomodoro number lights
   lightGreenLeds(currentPomodoroCount);
@@ -191,31 +191,37 @@ void displayState() {
       turnAllOff();
       break;
     case SHORT_BREAK:
-      // short break code here
-      // Figure out how many lights to light
+      // We're on a break, light a break light
       digitalWrite(amberLed1, HIGH);
+      // Figure out how much time has passed
       millisPassed = currentMillis - stateStartTime;
-      numLights = (shortBreakTime - convertMillisToMinute(millisPassed)) / (shortBreakTime / 5) + 1; // Adding one because of integer math, this is a hack
-      lightRedLeds(numLights);
+      // Figure out how many LEDs to light up, cast a variable as a float so we get a float back
+      numLeds = ((float)shortBreakTime - convertMillisToMinute(millisPassed)) / (shortBreakTime / 5); 
+      // Light em up
+      lightRedLeds(numLeds);
       break;
     case LONG_BREAK:
-      // long break code here
-      // Figure out how many lights to light
+      // We're on a break, light a break light
       digitalWrite(amberLed2, HIGH);
+      // Figure out how much time has passed
       millisPassed = currentMillis - stateStartTime;
-      numLights = (longBreakTime - convertMillisToMinute(millisPassed)) / (longBreakTime / 5) + 1; // Adding one because of integer math, this is a hack
-      lightRedLeds(numLights);
+      // Figure out how many LEDs to light up, cast a variable as a float so we get a float back
+      numLeds = ((float)longBreakTime - convertMillisToMinute(millisPassed)) / (longBreakTime / 5);
+      // Light em up
+      lightRedLeds(numLeds);
       break;
     case POMODORO:
-      // pomodoro code here
+      // Figure out how much time has passed
       millisPassed = currentMillis - stateStartTime;
-      numLights = (pomodoroTime - convertMillisToMinute(millisPassed)) / (pomodoroTime / 5) + 1; // Adding one because of integer math, this is a hack
-      lightRedLeds(numLights);
+      // Figure out how many LEDs to light up, cast a variable as a float so we get a float back
+      numLeds = ((float)pomodoroTime - convertMillisToMinute(millisPassed)) / (pomodoroTime / 5);
+      // Light em up
+      lightRedLeds(numLeds);
       break;
     case IN_PROCESS:
       lightRedLeds(0);
     default:
-      // Do nothing, for now
+      // Turn off break lights, although, I'm not sure we'll ever get here
       digitalWrite(amberLed1, LOW);
       digitalWrite(amberLed2, LOW);
   }
@@ -223,57 +229,49 @@ void displayState() {
 }
 
 // Light the number of red LEDs specified
-void lightRedLeds(int numLeds) {
-        switch (numLeds) {
-        case 1:
-          digitalWrite(redLed1, blinkLed());
-          digitalWrite(redLed2, LOW);
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-          break;
-        case 2:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, blinkLed());
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);  
-          break;     
-        case 3:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, blinkLed());
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-          break;
-        case 4:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, HIGH);
-          digitalWrite(redLed4, blinkLed());
-          digitalWrite(redLed5, LOW);
-          break;
-        case 5:
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, HIGH);
-          digitalWrite(redLed4, HIGH);
-          digitalWrite(redLed5, blinkLed());
-          break;
-        case 6:
-          // Same as 5, this is a hack
-          digitalWrite(redLed1, HIGH);
-          digitalWrite(redLed2, HIGH);
-          digitalWrite(redLed3, HIGH);
-          digitalWrite(redLed4, HIGH);
-          digitalWrite(redLed5, blinkLed());
-        default:
-          digitalWrite(redLed1, LOW);
-          digitalWrite(redLed2, LOW);
-          digitalWrite(redLed3, LOW);
-          digitalWrite(redLed4, LOW);
-          digitalWrite(redLed5, LOW);
-      }
+void lightRedLeds(float numLeds) {
+  if (numLeds > 4) {
+    digitalWrite(redLed1, HIGH);
+    digitalWrite(redLed2, HIGH);
+    digitalWrite(redLed3, HIGH);
+    digitalWrite(redLed4, HIGH);
+    digitalWrite(redLed5, blinkLed());
+  }
+  else if (numLeds > 3) {
+    digitalWrite(redLed1, HIGH);
+    digitalWrite(redLed2, HIGH);
+    digitalWrite(redLed3, HIGH);
+    digitalWrite(redLed4, blinkLed());
+    digitalWrite(redLed5, LOW);
+  }
+  else if (numLeds > 2) {
+    digitalWrite(redLed1, HIGH);
+    digitalWrite(redLed2, HIGH);
+    digitalWrite(redLed3, blinkLed());
+    digitalWrite(redLed4, LOW);
+    digitalWrite(redLed5, LOW);
+  }
+  else if (numLeds > 1) {
+    digitalWrite(redLed1, HIGH);
+    digitalWrite(redLed2, blinkLed());
+    digitalWrite(redLed3, LOW);
+    digitalWrite(redLed4, LOW);
+    digitalWrite(redLed5, LOW);  
+  }
+ else if (numLeds > 0) {
+     digitalWrite(redLed1, blinkLed());
+     digitalWrite(redLed2, LOW);
+     digitalWrite(redLed3, LOW);
+     digitalWrite(redLed4, LOW);
+     digitalWrite(redLed5, LOW);
+ }
+ else {
+     digitalWrite(redLed1, LOW);
+     digitalWrite(redLed2, LOW);
+     digitalWrite(redLed3, LOW);
+     digitalWrite(redLed4, LOW);
+     digitalWrite(redLed5, LOW);
+ }
 }
 
 // Light the number of green LEDs specified
