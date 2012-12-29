@@ -47,6 +47,7 @@ long stateStartTime;       // In milliseconds
 int ledState = LOW;        // This will be used if a LED needs to blink
 long previousMillis = 0;   // Last time the LED was updated
 long blinkInterval = 1000; // In milliseconds
+int modeFinished = 0;  // To let us know if the last pomodoro or break was completed
 
 void setup() {
   if (DEBUG) Serial.begin(9600);
@@ -100,6 +101,7 @@ void checkButtons() {
     switch (currentMode) {
       case IDLE:
         // do nothing
+        resetPomodoroCount();
         setCurrentMode(POMODORO);
         nextMode = SHORT_BREAK;
         if (DEBUG) Serial.println("changing to pomodoro mode");
@@ -116,11 +118,12 @@ void checkButtons() {
         break;
       case POMODORO:
         setCurrentMode(IN_PROCESS);
-        nextMode = POMODORO;
+        nextMode = POMODORO;  
         if (DEBUG) Serial.println("changing to in process mode from pomodoro");
         break;
       case IN_PROCESS:
         setCurrentMode(nextMode);
+        modeFinished = 0;
         if (DEBUG) Serial.print("changing from in process to next mode: ");
         if (DEBUG) Serial.println(nextMode);
         break;
@@ -143,6 +146,7 @@ void incrementTime() {
       if(currentMillis - stateStartTime > convertMinuteToMillis(shortBreakTime)){
         setCurrentMode(IN_PROCESS);
         nextMode = POMODORO;
+        modeFinished = 1;
       }
       break;
     case LONG_BREAK:
@@ -150,13 +154,14 @@ void incrementTime() {
       if(currentMillis - stateStartTime > convertMinuteToMillis(longBreakTime)){
         setCurrentMode(IDLE);
         nextMode = POMODORO;
-        resetPomodoroCount();
+        modeFinished = 1;
       }
       break;
     case POMODORO:
       // pomodoro code here
       if(currentMillis - stateStartTime > convertMinuteToMillis(pomodoroTime)){
         currentPomodoroCount++;
+        modeFinished = 1;
         if (currentPomodoroCount == 4) {
           setCurrentMode(IN_PROCESS);
           nextMode = LONG_BREAK;
@@ -188,7 +193,7 @@ void displayState() {
   switch (currentMode) {
     case IDLE:
       // Idle mode, turn off the lights, this is going to need to be fixed
-      turnAllOff();
+      // turnAllOff();
       break;
     case SHORT_BREAK:
       // We're on a break, light a break light
@@ -211,6 +216,9 @@ void displayState() {
       lightRedLeds(numLeds);
       break;
     case POMODORO:
+      // Turn off the break lights
+      digitalWrite(amberLed1, LOW);
+      digitalWrite(amberLed2, LOW);
       // Figure out how much time has passed
       millisPassed = currentMillis - stateStartTime;
       // Figure out how many LEDs to light up, cast a variable as a float so we get a float back
@@ -219,13 +227,27 @@ void displayState() {
       lightRedLeds(numLeds);
       break;
     case IN_PROCESS:
-      lightRedLeds(0);
+      if (modeFinished) {
+        blinkRedLeds();
+      }
+      else {
+        lightRedLeds(0);
+      }
+      break;
     default:
-      // Turn off break lights, although, I'm not sure we'll ever get here
-      digitalWrite(amberLed1, LOW);
-      digitalWrite(amberLed2, LOW);
+      // Do nothing
+      break;
   }
   
+}
+
+// Blink the red LEDs
+void blinkRedLeds() {
+  digitalWrite(redLed1, blinkLed());
+  digitalWrite(redLed2, blinkLed());
+  digitalWrite(redLed3, blinkLed());
+  digitalWrite(redLed4, blinkLed());
+  digitalWrite(redLed5, blinkLed());
 }
 
 // Light the number of red LEDs specified
