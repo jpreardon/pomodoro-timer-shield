@@ -20,34 +20,46 @@
 #define IN_PROCESS 5
 
 // Constants for input/output pins
-const int greenLed1 = 7;  // Green LEDs are for the pomodoro count
-const int greenLed2 = 8;
-const int greenLed3 = 9;
-const int greenLed4 = 10;  
-const int redLed1 = 2;    // Red LEDs count the time left
-const int redLed2 = 3;    // in a pomodoro, or a break
-const int redLed3 = 4;
-const int redLed4 = 5;
-const int redLed5 = 6;
+const int greenLed1 = 2;  // Green LEDs are for the pomodoro count
+const int greenLed2 = 4;
+const int greenLed3 = 7;
+const int greenLed4 = 8;  
+const int redLed1 = 3;    // Red LEDs count the time left
+const int redLed2 = 5;    // in a pomodoro, or a break
+const int redLed3 = 6;    // They need to be connected to PWM pins
+const int redLed4 = 9;
+const int redLed5 = 10;
 const int amberLed1 = 0;  // Short break indicator
 const int amberLed2 = 1;  // Long break indicator
 const int button1 = 11;   // Start/Interrupt
 const int button2 = 12;   // Reset
 
 // Constants for time values (in minutes)
-const int pomodoroTime = 25;
-const int shortBreakTime = 5;
-const int longBreakTime = 15;
+const int pomodoroTime = 25;  // Should be 25
+const int shortBreakTime = 5; // Should be 5
+const int longBreakTime = 15; // Should be 15
 
 // Fields to hold state
 int currentMode = IDLE;    // Values are IDLE, SHORT_BREAK, LONG_BREAK, POMODORO, IN_PROCESS
 int nextMode = POMODORO;   // Holds the next mode
 int currentPomodoroCount;  // Number of completed pomodoros
 long stateStartTime;       // In milliseconds
+int modeFinished = 0;      // To let us know if the last pomodoro or break was completed
+
+// LED Display variables
+// Blinky
 int ledState = LOW;        // This will be used if a LED needs to blink
+int blinkInterval = 1000; // In milliseconds
 long previousMillis = 0;   // Last time the LED was updated
-long blinkInterval = 1000; // In milliseconds
-int modeFinished = 0;  // To let us know if the last pomodoro or break was completed
+
+//Fade
+int ledFadeAmount = 1;                   // The amount to fade the LED(s)
+int minLedBrightness = 15;               // The minimum value for fading
+int maxLedBrightness = 255;              // Maximum brightness value for lit LEDs
+int maxLedFadeBrightness = 60;          // Fading LEDs are a little dimmer 
+int ledBrightness = minLedBrightness;    // The current brightness of the LED(s)
+int fadeInterval = 1400;                 // In milliseconds, the amount of time for fade cycle
+long previousFadeMillis = 0;             // Last time the fade LED was updated
 
 void setup() {
   if (DEBUG) Serial.begin(9600);
@@ -69,7 +81,7 @@ void setup() {
 }
 
 void loop() {
-  // Check to see if buttons are pressed (code to come)
+  // Check to see if buttons are pressed
   checkButtons();
   
   // Increment Everything
@@ -79,6 +91,7 @@ void loop() {
   displayState();
 }
 
+// Check the buttons to see if one of them is pressed
 void checkButtons() {
   // See if any button are pressed, if they are, do something
   
@@ -89,6 +102,8 @@ void checkButtons() {
     }
     // full reset
     setCurrentMode(IDLE);
+    modeFinished = 0;
+    resetPomodoroCount();
     if (DEBUG) Serial.println("RESET!");
   }
   
@@ -100,8 +115,8 @@ void checkButtons() {
     
     switch (currentMode) {
       case IDLE:
-        // do nothing
         resetPomodoroCount();
+        modeFinished = 0;
         setCurrentMode(POMODORO);
         nextMode = SHORT_BREAK;
         if (DEBUG) Serial.println("changing to pomodoro mode");
@@ -131,6 +146,8 @@ void checkButtons() {
   }
 }
 
+// This is the function that will set the proper state when the time has elapsed
+// for a given mode.
 void incrementTime() {
   
   unsigned long currentMillis = millis();
@@ -180,20 +197,28 @@ void incrementTime() {
  
 }
 
+// This function displays the current state
 void displayState() {
   
   unsigned long currentMillis = millis();
   unsigned long millisPassed;
   float numLeds;
   
-  // We always light the proper number of pomodoro number lights
-  lightGreenLeds(currentPomodoroCount);
+  // We always light the proper number of pomodoro number lights, unless the state is idle
+  if (currentMode != IDLE) {
+    lightGreenLeds(currentPomodoroCount);
+  }
   
   // Light up leds based on the current state
   switch (currentMode) {
     case IDLE:
-      // Idle mode, turn off the lights, this is going to need to be fixed
-      // turnAllOff();
+      // If we reached the end of the pomodoro cycle, blink the green leds
+      if (modeFinished) {
+        blinkGreenLeds();
+      } 
+      else {
+        turnAllOff();
+      }
       break;
     case SHORT_BREAK:
       // We're on a break, light a break light
@@ -250,8 +275,17 @@ void blinkRedLeds() {
   digitalWrite(redLed5, blinkLed());
 }
 
+// Blink the green LEDs
+void blinkGreenLeds() {
+  digitalWrite(greenLed1, blinkLed());
+  digitalWrite(greenLed2, blinkLed());
+  digitalWrite(greenLed3, blinkLed());
+  digitalWrite(greenLed4, blinkLed());
+}
+
 // Light the number of red LEDs specified
-void lightRedLeds(float numLeds) {
+// This shoudl be deleted
+void lightRedLedsOlde(float numLeds) {
   if (numLeds > 4) {
     digitalWrite(redLed1, HIGH);
     digitalWrite(redLed2, HIGH);
@@ -296,6 +330,53 @@ void lightRedLeds(float numLeds) {
  }
 }
 
+// Light the number of red LEDs specified
+// With a nice fade
+void lightRedLeds(float numLeds) {
+  if (numLeds > 4) {
+    analogWrite(redLed1, maxLedBrightness);
+    analogWrite(redLed2, maxLedBrightness);
+    analogWrite(redLed3, maxLedBrightness);
+    analogWrite(redLed4, maxLedBrightness);
+    analogWrite(redLed5, fadeLed());
+  }
+  else if (numLeds > 3) {
+    analogWrite(redLed1, maxLedBrightness);
+    analogWrite(redLed2, maxLedBrightness);
+    analogWrite(redLed3, maxLedBrightness);
+    analogWrite(redLed4, fadeLed());
+    analogWrite(redLed5, LOW);
+  }
+  else if (numLeds > 2) {
+    analogWrite(redLed1, maxLedBrightness);
+    analogWrite(redLed2, maxLedBrightness);
+    analogWrite(redLed3, fadeLed());
+    analogWrite(redLed4, LOW);
+    analogWrite(redLed5, LOW);
+  }
+  else if (numLeds > 1) {
+    analogWrite(redLed1, maxLedBrightness);
+    analogWrite(redLed2, fadeLed());
+    analogWrite(redLed3, LOW);
+    analogWrite(redLed4, LOW);
+    analogWrite(redLed5, LOW);  
+  }
+ else if (numLeds > 0) {
+     analogWrite(redLed1, fadeLed());
+     analogWrite(redLed2, LOW);
+     analogWrite(redLed3, LOW);
+     analogWrite(redLed4, LOW);
+     analogWrite(redLed5, LOW);
+ }
+ else {
+     analogWrite(redLed1, LOW);
+     analogWrite(redLed2, LOW);
+     analogWrite(redLed3, LOW);
+     analogWrite(redLed4, LOW);
+     analogWrite(redLed5, LOW);
+ }
+}
+
 // Light the number of green LEDs specified
 void lightGreenLeds(int numLeds) {
     switch (numLeds) {
@@ -331,6 +412,7 @@ void lightGreenLeds(int numLeds) {
   }
 }
  
+// Should a blinky LED be lit or not? Returns a HIGH or LOW value based on time
 int blinkLed() {
   unsigned long currentMillis = millis();
   
@@ -345,6 +427,20 @@ int blinkLed() {
     }
   }
   return ledState;
+}
+
+// Returns a fade value
+int fadeLed() {
+  unsigned long currentMillis = millis();
+  
+  if ((currentMillis - previousFadeMillis) > fadeInterval / ((maxLedFadeBrightness - minLedBrightness) / abs(ledFadeAmount))) {
+    ledBrightness = ledBrightness + ledFadeAmount;
+    previousFadeMillis = currentMillis;
+    if (ledBrightness == minLedBrightness || ledBrightness == maxLedFadeBrightness) {
+      ledFadeAmount = -ledFadeAmount ; 
+    } 
+  }
+  return ledBrightness;
 }
  
 void turnAllOn() {
