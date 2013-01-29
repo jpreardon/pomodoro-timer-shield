@@ -1,11 +1,16 @@
 /*
-  This is a simple pomodoro timer that can be used to practice the pomodoro technique. For
-  a schematic, take a look on my site http://jpreardon.com/ 
-  
-  For more on the pomodoro technique, check out this site http://www.pomodorotechnique.com
-  
-  Created 2012-12-27
+  Project Name: Pomorodo Timer Shield
+  Created: 2012-12-27
   By: John P. Reardon <jp@jpreardon.com>
+  Version: 1.0.0 (2013-01-28)
+
+  This is a simple timer shield that can be used to practice the Pomodoro Technique®. For
+  a schematic and board layout visit this site http://jpreardon.com/projects/pomodoro-timer/
+  
+  For more on the Pomodoro Technique®, check out this site http://www.pomodorotechnique.com
+
+  Copyright (c) 2012 John P. Reardon
+  Licensed under the MIT license.
   
 */
 
@@ -20,19 +25,19 @@
 #define IN_PROCESS 5
 
 // Constants for input/output pins
-const int greenLed1 = 2;  // Green LEDs are for the pomodoro count
-const int greenLed2 = 4;
-const int greenLed3 = 7;
-const int greenLed4 = 8;  
-const int redLed1 = 3;    // Red LEDs count the time left
-const int redLed2 = 5;    // in a pomodoro, or a break
-const int redLed3 = 6;    // They need to be connected to PWM pins
-const int redLed4 = 9;
-const int redLed5 = 10;
-const int amberLed1 = 0;  // Short break indicator
-const int amberLed2 = 1;  // Long break indicator
-const int button1 = 11;   // Start/Interrupt
-const int button2 = 12;   // Reset
+const int greenLed1 = 8;   // Green LEDs are for the pomodoro count
+const int greenLed2 = 7;
+const int greenLed3 = 4;
+const int greenLed4 = 2;  
+const int redLed1 = 6;     // Red LEDs count the time left
+const int redLed2 = 9;     // in a pomodoro, or a break
+const int redLed3 = 10;    // They need to be connected to PWM pins
+const int redLed4 = 3;
+const int redLed5 = 5;
+const int blueLed1 = 0;    // Short break indicator
+const int blueLed2 = 1;    // Long break indicator
+const int button1 = 11;    // Start/Interrupt
+const int button2 = 12;    // Reset
 
 // Constants for time values (in minutes)
 const int pomodoroTime = 25;  // Should be 25
@@ -48,17 +53,17 @@ int modeFinished = 0;      // To let us know if the last pomodoro or break was c
 
 // LED Display variables
 // Blinky
-int ledState = LOW;        // This will be used if a LED needs to blink
-int blinkInterval = 1000; // In milliseconds
-long previousMillis = 0;   // Last time the LED was updated
+int ledState = LOW;         // This will be used if a LED needs to blink
+int blinkInterval = 1000;   // In milliseconds
+long previousMillis = 0;    // Last time the LED was updated
 
 //Fade
 int ledFadeAmount = 1;                   // The amount to fade the LED(s)
-int minLedBrightness = 15;               // The minimum value for fading
+int minLedBrightness = 10;               // The minimum value for fading
 int maxLedBrightness = 255;              // Maximum brightness value for lit LEDs
-int maxLedFadeBrightness = 60;          // Fading LEDs are a little dimmer 
+int maxLedFadeBrightness = 200;          // Fading LEDs are a little dimmer
 int ledBrightness = minLedBrightness;    // The current brightness of the LED(s)
-int fadeInterval = 1400;                 // In milliseconds, the amount of time for fade cycle
+int fadeInterval = 1500;                 // In milliseconds, the amount of time for fade cycle
 long previousFadeMillis = 0;             // Last time the fade LED was updated
 
 void setup() {
@@ -74,8 +79,8 @@ void setup() {
   pinMode(redLed3, OUTPUT);
   pinMode(redLed4, OUTPUT);
   pinMode(redLed5, OUTPUT);
-  pinMode(amberLed1, OUTPUT);
-  pinMode(amberLed2, OUTPUT);
+  pinMode(blueLed1, OUTPUT);
+  pinMode(blueLed2, OUTPUT);
   pinMode(button1, INPUT);
   pinMode(button2, INPUT);
 }
@@ -222,7 +227,7 @@ void displayState() {
       break;
     case SHORT_BREAK:
       // We're on a break, light a break light
-      digitalWrite(amberLed1, HIGH);
+      digitalWrite(blueLed1, HIGH);
       // Figure out how much time has passed
       millisPassed = currentMillis - stateStartTime;
       // Figure out how many LEDs to light up, cast a variable as a float so we get a float back
@@ -232,7 +237,7 @@ void displayState() {
       break;
     case LONG_BREAK:
       // We're on a break, light a break light
-      digitalWrite(amberLed2, HIGH);
+      digitalWrite(blueLed2, HIGH);
       // Figure out how much time has passed
       millisPassed = currentMillis - stateStartTime;
       // Figure out how many LEDs to light up, cast a variable as a float so we get a float back
@@ -242,8 +247,8 @@ void displayState() {
       break;
     case POMODORO:
       // Turn off the break lights
-      digitalWrite(amberLed1, LOW);
-      digitalWrite(amberLed2, LOW);
+      digitalWrite(blueLed1, LOW);
+      digitalWrite(blueLed2, LOW);
       // Figure out how much time has passed
       millisPassed = currentMillis - stateStartTime;
       // Figure out how many LEDs to light up, cast a variable as a float so we get a float back
@@ -454,8 +459,8 @@ void turnAllOn() {
  digitalWrite(redLed3, HIGH);
  digitalWrite(redLed4, HIGH);
  digitalWrite(redLed5, HIGH);
- digitalWrite(amberLed1, HIGH);
- digitalWrite(amberLed2, HIGH);
+ digitalWrite(blueLed1, HIGH);
+ digitalWrite(blueLed2, HIGH);
 }
 
 void turnAllOff() {
@@ -469,8 +474,8 @@ void turnAllOff() {
  digitalWrite(redLed3, LOW);
  digitalWrite(redLed4, LOW);
  digitalWrite(redLed5, LOW);
- digitalWrite(amberLed1, LOW);
- digitalWrite(amberLed2, LOW);
+ digitalWrite(blueLed1, LOW);
+ digitalWrite(blueLed2, LOW);
 }
 
 long convertMinuteToMillis(int minutes) {
