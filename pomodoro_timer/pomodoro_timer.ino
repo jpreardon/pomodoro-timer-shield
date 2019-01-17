@@ -3,13 +3,14 @@
   Created: 2012-12-27
   By: John P. Reardon <jp@jpreardon.com>
   Version: 1.0.0 (2013-01-28)
+  Version: 1.0.1 (2019-01-16)
 
   This is a simple timer shield that can be used to practice the Pomodoro Technique®. For
   a schematic and board layout visit this site http://jpreardon.com/projects/pomodoro-timer/
   
   For more on the Pomodoro Technique®, check out this site http://www.pomodorotechnique.com
 
-  Copyright (c) 2012 John P. Reardon
+  © Copyright 2012-2019 John P. Reardon
   Licensed under the MIT license.
   
 */
@@ -58,13 +59,13 @@ int blinkInterval = 1000;   // In milliseconds
 long previousMillis = 0;    // Last time the LED was updated
 
 //Fade
-int ledFadeAmount = 1;                   // The amount to fade the LED(s)
-int minLedBrightness = 10;               // The minimum value for fading
-int maxLedBrightness = 255;              // Maximum brightness value for lit LEDs
-int maxLedFadeBrightness = 200;          // Fading LEDs are a little dimmer
-int ledBrightness = minLedBrightness;    // The current brightness of the LED(s)
-int fadeInterval = 1500;                 // In milliseconds, the amount of time for fade cycle
-long previousFadeMillis = 0;             // Last time the fade LED was updated
+int ledFadeAmount = 1;                  // The amount to fade the LED(s)
+int minLedBrightness = 5;               // The minimum value for fading
+int maxLedBrightness = 50;              // Maximum brightness value for lit LEDs (50)
+int maxLedFadeBrightness = 50;          // Fading LEDs are a little dimmer
+int ledBrightness = minLedBrightness;   // The current brightness of the LED(s)
+int fadeInterval = 1000;                // In milliseconds, the amount of time for fade cycle
+long previousFadeMillis = 0;            // Last time the fade LED was updated
 
 void setup() {
   if (DEBUG) Serial.begin(9600);
@@ -273,11 +274,11 @@ void displayState() {
 
 // Blink the red LEDs
 void blinkRedLeds() {
-  digitalWrite(redLed1, blinkLed());
-  digitalWrite(redLed2, blinkLed());
-  digitalWrite(redLed3, blinkLed());
-  digitalWrite(redLed4, blinkLed());
-  digitalWrite(redLed5, blinkLed());
+  analogWrite(redLed1, fadeLed());
+  analogWrite(redLed2, fadeLed());
+  analogWrite(redLed3, fadeLed());
+  analogWrite(redLed4, fadeLed());
+  analogWrite(redLed5, fadeLed());
 }
 
 // Blink the green LEDs
@@ -286,53 +287,6 @@ void blinkGreenLeds() {
   digitalWrite(greenLed2, blinkLed());
   digitalWrite(greenLed3, blinkLed());
   digitalWrite(greenLed4, blinkLed());
-}
-
-// Light the number of red LEDs specified
-// This shoudl be deleted
-void lightRedLedsOlde(float numLeds) {
-  if (numLeds > 4) {
-    digitalWrite(redLed1, HIGH);
-    digitalWrite(redLed2, HIGH);
-    digitalWrite(redLed3, HIGH);
-    digitalWrite(redLed4, HIGH);
-    digitalWrite(redLed5, blinkLed());
-  }
-  else if (numLeds > 3) {
-    digitalWrite(redLed1, HIGH);
-    digitalWrite(redLed2, HIGH);
-    digitalWrite(redLed3, HIGH);
-    digitalWrite(redLed4, blinkLed());
-    digitalWrite(redLed5, LOW);
-  }
-  else if (numLeds > 2) {
-    digitalWrite(redLed1, HIGH);
-    digitalWrite(redLed2, HIGH);
-    digitalWrite(redLed3, blinkLed());
-    digitalWrite(redLed4, LOW);
-    digitalWrite(redLed5, LOW);
-  }
-  else if (numLeds > 1) {
-    digitalWrite(redLed1, HIGH);
-    digitalWrite(redLed2, blinkLed());
-    digitalWrite(redLed3, LOW);
-    digitalWrite(redLed4, LOW);
-    digitalWrite(redLed5, LOW);  
-  }
- else if (numLeds > 0) {
-     digitalWrite(redLed1, blinkLed());
-     digitalWrite(redLed2, LOW);
-     digitalWrite(redLed3, LOW);
-     digitalWrite(redLed4, LOW);
-     digitalWrite(redLed5, LOW);
- }
- else {
-     digitalWrite(redLed1, LOW);
-     digitalWrite(redLed2, LOW);
-     digitalWrite(redLed3, LOW);
-     digitalWrite(redLed4, LOW);
-     digitalWrite(redLed5, LOW);
- }
 }
 
 // Light the number of red LEDs specified
@@ -495,5 +449,3 @@ void setCurrentMode(int newMode) {
 void resetPomodoroCount() {
   currentPomodoroCount = 0;
 }
-
-
